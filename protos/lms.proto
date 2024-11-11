@@ -1,0 +1,201 @@
+syntax = "proto3";
+
+package lms;
+
+// Request to login to the LMS
+message LoginRequest {
+    string role = 1;
+    string username = 2;
+    string password = 3;
+}
+
+// Response for login
+message LoginResponse {
+    bool success = 1;
+    string token = 2;
+    string userId = 3;
+    string errorMessage = 4; // Error message if login fails
+}
+
+// Request to post data
+message PostRequest {
+    string token = 1;
+    string type = 2;
+    bytes data = 3;
+    string filename = 4;  // For assignments
+    string filetype = 5; // "pdf" or "txt"
+}
+
+// Response for post data
+message PostResponse {
+    bool success = 1;
+    string message = 2;
+    string assignmentId = 3;
+    string query_id = 4;
+    string errorMessage = 5;  // Error message in case of failure
+}
+
+message AnswerQueryRequest {
+    string queryId = 1;  // ID of the query to be answered
+    string answer = 2;     // Answer text
+    string token=3;
+}
+
+message AnswerQueryResponse {
+    bool success = 1;      // Success status
+    string message = 2;    // Additional message
+}
+
+// Request to get data
+message GetRequest {
+    string token = 1;
+    string type = 2;
+    string optional_data = 3;  // Can be user ID or other filters
+}
+
+// Response to get data
+message GetResponse {
+    bool success = 1;
+    string message = 2;
+    repeated DataItem data = 3;
+    string errorMessage = 4;  // Error message in case of failure
+}
+
+// Data item structure
+message DataItem {
+    string typeId = 1;   // User ID
+    string data = 2;     // Assignment path or query content
+    string grade = 3;    // Grade for assignment
+    string file_type = 4;  // "pdf" or "txt"
+    string timestamp = 5;  // Time when the assignment was posted
+    bytes file_content = 6; // Add this to store the actual file content
+    string file_path=7;
+    string user_id=8;
+    string answer=9;
+    string assignment_id = 10;
+}
+
+
+// Request to grade an assignment
+message GradeRequest {
+    string token = 1;
+    string assignmentId = 2;
+    string grade = 3;
+}
+
+// Response for grading an assignment
+message GradeResponse {
+    bool success = 1;
+    string message = 2;
+    string errorMessage = 3;  // Error message in case of failure
+}
+
+message LMS_LLMQueryRequest {
+    string query_id = 1;
+}
+
+message LMS_LLMResponse {
+    bool success = 1;
+    string response = 2;
+}
+
+// LMS service definition
+service LMS {
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc Post(PostRequest) returns (PostResponse);
+    rpc Get(GetRequest) returns (GetResponse);
+    rpc Grade(GradeRequest) returns (GradeResponse);  // RPC for grading
+    rpc GetLlmAnswer(LMS_LLMQueryRequest) returns (LMS_LLMResponse); //RPC for retrieving answer from LLM - tutoring server 
+    rpc AnswerQuery (AnswerQueryRequest) returns (AnswerQueryResponse);
+
+}
+
+message LLMQueryRequest{
+    string question = 1;
+}
+
+message LLMResponse {
+    string answer = 1;
+}
+
+// LLM service definition
+service LLM {
+    rpc GetLLMAnswerResponse(LLMQueryRequest) returns (LLMResponse);
+}
+
+
+// Raft implementation:
+
+service Raft {
+    rpc requestVote (VoteRequest) returns (VoteResponse);
+    rpc appendEntries (AppendEntriesRequest) returns (AppendEntriesResponse);
+    rpc getLeader(Empty) returns (LeaderResponse); // New RPC method
+
+}
+
+message VoteRequest {
+    int32 term = 1;
+    string candidate_id = 2;
+    int32 last_log_index = 3;
+    int32 last_log_term = 4;
+}
+
+message VoteResponse {
+    bool vote_granted = 1;
+}
+
+
+
+message AppendEntriesRequest {
+   int32 term = 1;
+   string leader_id = 2;
+   repeated LogEntry entries = 3;
+   int32 prev_log_index = 4;
+   int32 prev_log_term = 5;
+   int32 leader_commit = 6;
+   string from = 7;                       // The node sending the AppendEntries request
+   string to = 8;
+   string operation = 9;
+}
+
+
+message AppendEntriesResponse {
+   bool success = 6;
+   string from = 1;                       // The node sending the response
+   string to = 2;                         // The node receiving the response
+   int32 term = 3;                        // The current term (to update leader if necessary)
+   int32 matchIndex = 5;
+}
+
+
+// Define a log entry that will be replicated
+// Define a log entry that will be replicated
+message LogEntry {
+    string token = 1;
+    string type = 2;
+    string data = 3;
+    int32 term = 4;
+    string filename = 5;
+    string filetype = 6;
+    string assignmentId = 7;
+    string grade = 8;
+}
+
+
+
+message Empty {} // For the getLeaderId RPC
+
+message LeaderResponse {
+    string leader_node_id = 1;
+    string leader_ip_address = 2; // Field to return the leader ID
+}
+
+
+
+
+
+
+
+
+
+

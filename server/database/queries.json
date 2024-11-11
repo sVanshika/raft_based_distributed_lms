@@ -1,0 +1,17 @@
+[
+    {
+        "query_id": 1,
+        "user_id": "S101",
+        "data": "This is my first query."
+    },
+    {
+        "query_id": 2,
+        "user_id": "S101",
+        "data": "This is my first query."
+    },
+    {
+        "query_id": 3,
+        "user_id": "S101",
+        "data": "This is my first query."
+    }
+]
