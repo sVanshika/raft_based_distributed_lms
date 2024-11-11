@@ -1,5 +1,10 @@
 # Distributed Learning Management System with RPC, RAFT & LLM server
-###### OPEN THE INNERMOST RPC FOLDER
+
+This project is a simplified distributed Learning Management System (LMS) that supports
+basic student and instructor interactions. The system will include real-time tutoring assistance powered by a
+lightweight LLM. To ensure consistency in critical data (like grades and progress), a
+basic implementation of the Raft consensus protocol is used. 
+
 
 ## Installation
 1. Open the terminal (Ensure virtual environment is running)
