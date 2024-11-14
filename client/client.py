@@ -470,6 +470,7 @@ def answer_query(stub, token):
     answer_request = lms_pb2.AnswerQueryRequest(queryId=query_id, answer=answer_data, token=token)
 
     try:
+        print("Vanshika")
         response = stub.AnswerQuery(answer_request)
     except grpc.RpcError as error:
         print(f"RPC Error in get_llm_response: {error.code()} - {error.details()}")
