@@ -13,7 +13,7 @@ from .LMSRaftService import LMSRaftService
 from node_addresses import node_addresses
 
 
-llm_channel = grpc.insecure_channel('172.17.48.144:50054')
+llm_channel = grpc.insecure_channel('172.17.49.224:50054')
 llm_stub = lms_pb2_grpc.LLMStub(llm_channel)
 
 # Use os.path.join to dynamically construct paths
@@ -402,12 +402,23 @@ class LMSService(lms_pb2_grpc.LMSServicer):
         else:
             new_query_id = 1
 
+
+        # llm
+        print(f"@@@ request.data {request.data}")
+        question = query_data
+        llm_request = lms_pb2.LLMQueryRequest(question=question)
+        print(f"$$$$$$ llm_request: {llm_request}")
+        llm_answer = llm_stub.GetLLMAnswerResponse(llm_request)
+        print(f"$$$$$$ answer: {llm_answer}")
+
         # Append new query entry
         new_entry = {
             "query_id": new_query_id,
             "user_id": id,
-            "data": query_data  # Ensure this is a string
+            "data": query_data,
+            "answer": llm_answer.answer
         }
+        
         queries_data.append(new_entry)  # Append the new entry
 
 

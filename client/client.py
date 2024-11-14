@@ -211,8 +211,9 @@ def post(token, data_type, data, query_answer_choice):
                 if query_answer_choice == 1: #instructor
                     print("Instructor will answer your query!")
                 elif query_answer_choice == 2: #llm 
+                    pass
                     # retrieving query response from llm server
-                    get_llm_response(post_response.query_id)
+                    # get_llm_response(post_response.query_id)
 
 
             else:

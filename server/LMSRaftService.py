@@ -24,12 +24,12 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
         
         # self.election_timeout = 15 if self.node_id == 'node1' else 25  # Election timeout in seconds
         if self.node_id == 'node1':
-            self.election_timeout = 15
+            self.election_timeout = 10
         elif self.node_id == 'node2':
-            self.election_timeout = 20
+            self.election_timeout = 30
         else:
-            self.election_timeout = 25
-        self.heartbeat_interval = 15  # Leader heartbeat interval in seconds
+            self.election_timeout = 35
+        self.heartbeat_interval = 5  # Leader heartbeat interval in seconds
         self.election_timer = None
         self.leader_id = None
         self.leader_ip = None
