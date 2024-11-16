@@ -3,7 +3,8 @@ from concurrent import futures
 from protos import lms_pb2
 from protos import lms_pb2_grpc
 import sys
-
+import colorama
+from colorama import Fore, Back, Style
 import json
 import uuid
 import os
@@ -12,6 +13,7 @@ import PyPDF2
 from .LMSRaftService import LMSRaftService
 from node_addresses import node_addresses
 
+colorama.init()
 
 llm_channel = grpc.insecure_channel('172.17.49.224:50054')
 llm_stub = lms_pb2_grpc.LLMStub(llm_channel)
@@ -91,8 +93,9 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                         votes = self.append_entries_raft(new_entry)
                         # if votes > majority
                         if votes >= (len(self.raft_node.peers) // 2):
-                            print(">>>>> majority votes recieved !")
+                            print(Fore.MAGENTA +">>>>> majority votes recieved !"+ Style.RESET_ALL)
                             # self commit
+                            print("Self Commit")
                             relative_path = self.handle_text_upload(request, directory, context)
                             # send commit requests
                             self.commit_entries_raft(new_entry)
@@ -115,7 +118,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                                             message=f"{request.filetype.capitalize()} posted successfully")
 
             elif request.type == "query":
-                print(">>>>>> query")
+                # print(">>>>>> query")
                 # print(f">>>>> {self.raft_node},  {self.raft_node.state}")
 
                 new_entry = {}
@@ -123,6 +126,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                 new_entry["type"]=request.type
                 new_entry["data"]=request.data
                 new_entry["term"] = self.raft_node.current_term
+                new_entry["filetype"] = request.filetype
 
                 # Invoking Raft mechanism for log replication
                 if self.raft_node.state == 'Leader':
@@ -132,9 +136,10 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                     # Replicate to followers
                     votes = 0
                     for follower_node in self.raft_node.peers.keys():
-                        print(f">>>>> Sending append request to {follower_node}")
+                        
                         try:
                             if follower_node != self.raft_node.node_id:
+                                print(Fore.CYAN +f"Sending append request to {follower_node}"+ Style.RESET_ALL)
                                 follower_stub = self.raft_node.get_follower_stub(follower_node)
                                 append_request = lms_pb2.AppendEntriesRequest(
                                     entries=[new_entry],
@@ -148,7 +153,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                                 # print(f">>>>> append_request: {append_request}")
                                 # print(f">> {append_request.prev_log_index} {append_request.leader_commit}")
                                 response = follower_stub.appendEntries(append_request)
-                                print(f">>>>> append_entries_response: {response.success} ")
+                                print(f">>>>> Append Entries Response: {response.success} ")
                             
                                 if response.success == True:
                                     votes += 1
@@ -168,21 +173,22 @@ class LMSService(lms_pb2_grpc.LMSServicer):
 
                     # Commit the log entry after replication
                     if votes >= (len(self.raft_node.peers) // 2):
-                        print(">>>>> majority votes recieved !")
+                        print(Fore.MAGENTA + ">>>>> majority votes recieved !"+Style.RESET_ALL)
                         
                         self.raft_node.commit_index += 1
-                        print(f"Committed query log entry at commit index = {self.raft_node.commit_index}")
+                        print(Style.BRIGHT + Fore.YELLOW +f"Committed query log entry at commit index = {self.raft_node.commit_index}"+ Style.RESET_ALL)
                         
                         # Save the query after replication is successful
-                        new_query_id = str(self.save_query(request, id))
-                        print(f"Query posted successfully on node {self.raft_node.node_id} with ID: {new_query_id}")
-
+                        new_query_id, llm_answer = self.save_query(request, id)
+                        print(Fore.BLUE +f"Query posted successfully on node {self.raft_node.node_id} with ID: {new_query_id}"+Style.RESET_ALL)
+                        
                         # Send commit request to all followers
                         print("Sending commit requests to all followers !")
                         for follower_node in self.raft_node.peers.keys():
-                            print(f">>>>> {follower_node}")
                             try:
                                 if follower_node != self.raft_node.node_id:
+                                    print(Fore.CYAN + f"Sending commit request to {follower_node}" + Style.RESET_ALL)
+
                                     follower_stub = self.raft_node.get_follower_stub(follower_node)
                                     commit_request = lms_pb2.AppendEntriesRequest(
                                         entries=[new_entry],
@@ -196,7 +202,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                                     # print(f">>>>> commit_request: {commit_request}")
                                     # print(f">> {commit_request.prev_log_index} {commit_request.leader_commit}")
                                     response = follower_stub.appendEntries(commit_request)
-                                    print(f">>>>> commit_response: {response.success} ")
+                                    print(f">>>>> Commit Response: {response.success} ")
                             except grpc.RpcError as e:
                                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                                     print("Error: Service unavailable. Check server status or network connection.")
@@ -207,7 +213,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                         
 
 
-                        return lms_pb2.PostResponse(success=True, message=f"Query posted successfully", query_id=new_query_id)
+                        return lms_pb2.PostResponse(success=True, message=f"{llm_answer}", query_id=new_query_id)
                     
                     else:
                         print("--- majority votes are NOT received")
@@ -235,9 +241,10 @@ class LMSService(lms_pb2_grpc.LMSServicer):
             # Replicate to followers
             
             for follower_node in self.raft_node.peers.keys():
-                print(f">>>>> {follower_node}")
+                
                 try:
                     if follower_node != self.raft_node.node_id:
+                        print(Fore.CYAN + f"Sending append request to {follower_node}" + Style.RESET_ALL)
                         follower_stub = self.raft_node.get_follower_stub(follower_node)
                         append_request = lms_pb2.AppendEntriesRequest(
                             entries=[new_entry],
@@ -249,9 +256,9 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                             operation="LR-A"
                         )
                         # print(f">>>>> append_request: {append_request}")
-                        print(f">> {append_request.prev_log_index} {append_request.leader_commit}")
+                        # print(f">> {append_request.prev_log_index} {append_request.leader_commit}")
                         response = follower_stub.appendEntries(append_request)
-                        # print(f">>>>> append_entries_response: {response.success} ")
+                        print(f">>>>> Append Entries Response: {response.success} ")
                     
                         if response.success == True:
                             votes += 1
@@ -272,9 +279,10 @@ class LMSService(lms_pb2_grpc.LMSServicer):
     def commit_entries_raft(self, new_entry):
         print("Sending commit requests to all followers !")
         for follower_node in self.raft_node.peers.keys():
-            print(f">>>>> {follower_node}")
             try:
                 if follower_node != self.raft_node.node_id:
+                    print(Fore.CYAN + f"Sending commit request to {follower_node}" + Style.RESET_ALL)
+
                     follower_stub = self.raft_node.get_follower_stub(follower_node)
                     commit_request = lms_pb2.AppendEntriesRequest(
                         entries=[new_entry],
@@ -285,10 +293,10 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                         leader_commit=self.raft_node.commit_index,
                         operation="LR-C"
                     )
-                    print(f">>>>> commit_request: {commit_request}")
-                    print(f">> {commit_request.prev_log_index} {commit_request.leader_commit}")
+                    #print(f">>>>> commit_request: {commit_request}")
+                    #print(f">> {commit_request.prev_log_index} {commit_request.leader_commit}")
                     response = follower_stub.appendEntries(commit_request)
-                    print(f">>>>> commit_response: {response.success} ")
+                    print(f">>>>> Commit Response: {response.success}")
             except grpc.RpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     print("Error: Service unavailable. Check server status or network connection.")
@@ -334,7 +342,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                 # Save the content to a text file
             with open(str(file_path), 'wb') as text_file:
                 text_file.write(text_data)  # Write the bytes to a file
-                print(f"Text assignment posted: {file_path}")
+                print(Fore.GREEN +f"Text assignment posted: {file_path}"+ Style.RESET_ALL)
             return relative_path
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -342,7 +350,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
             return None
 
     def update_data(self, relative_path, id, directory,isAssignment):
-        print("******* update_data")
+        # print("******* update_data")
         #file_path = f"server\\database\\course.json" if directory == course_directory else assignments_path
         file_path = course_json_path if directory == course_directory else assignments_path
 
@@ -356,7 +364,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
             "user_id": id,
             "data_path": relative_path
         }
-        print(f"******* {new_entry}")
+        # print(f"******* {new_entry}")
         if (isAssignment == True):
             # Initialize new_assignment_id based on existing assignments for the user
             student_assignments = [a for a in data if a["user_id"] == id]
@@ -373,8 +381,8 @@ class LMSService(lms_pb2_grpc.LMSServicer):
 
         data.append(new_entry)
 
-        print(file_path)
-        print()
+        # print(file_path)
+        # print()
         with open(file_path, 'w') as file:
             json.dump(data, file, indent=4)
 
@@ -404,28 +412,38 @@ class LMSService(lms_pb2_grpc.LMSServicer):
 
 
         # llm
-        print(f"@@@ request.data {request.data}")
-        question = query_data
-        llm_request = lms_pb2.LLMQueryRequest(question=question)
-        print(f"$$$$$$ llm_request: {llm_request}")
-        llm_answer = llm_stub.GetLLMAnswerResponse(llm_request)
-        print(f"$$$$$$ answer: {llm_answer}")
+        # print(f"@@@ request.data {request.data}")
+        if request.type == "query" and request.filetype == "llm":
+            question = query_data
+            llm_request = lms_pb2.LLMQueryRequest(question=question)
+            print(f"$$ llm_request: {llm_request}")
+            llm_answer = llm_stub.GetLLMAnswerResponse(llm_request)
+            print(Fore.MAGENTA +f"LLM {llm_answer}"+ Style.RESET_ALL)
 
-        # Append new query entry
-        new_entry = {
-            "query_id": new_query_id,
-            "user_id": id,
-            "data": query_data,
-            "answer": llm_answer.answer
-        }
-        
+            # Append new query entry
+            new_entry = {
+                "query_id": new_query_id,
+                "user_id": id,
+                "data": query_data,
+                "answer": llm_answer.answer
+            }
+            answer = llm_answer.answer
+
+        else:
+            new_entry = {
+                "query_id": new_query_id,
+                "user_id": id,
+                "data": query_data
+            }
+            answer = ""
+            
         queries_data.append(new_entry)  # Append the new entry
 
 
         # Write back to the JSON file
         with open(queries_path, 'w') as file:
             json.dump(queries_data, file, indent=4)  # Ensure formatting is correct
-        return str(new_query_id)
+        return str(new_query_id),answer
 
     def Get(self, request, context):
         data_list = []
@@ -523,7 +541,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
 
                                 return lms_pb2.GetResponse(success=False, message="Course content file not found",
                                                            data=[])
-                    print("Course Content retrived")
+                    print(Fore.GREEN +"Course Content retrived"+ Style.RESET_ALL)
 
                     return lms_pb2.GetResponse(success=True, data=data_list,
                                                message="Course content retrieved successfully")
@@ -560,6 +578,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                     print(">>>>> majority votes recieved !")
                     
                     ''' self commit '''
+                    print("Self Commit")
                     self.submit_grade(request=request)
                     ''' send commit requests '''
                     self.commit_entries_raft(new_entry)
@@ -592,7 +611,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
             for assignment in assignments_data:
                 if str(assignment.get("assignment_id", "")) == assignment_id:
                     assignment["grade"] = grade  # Add the grade field
-                    print(f"Grade for assignment ID {assignment_id} set to {grade}.")
+                    print(Fore.GREEN + f"Grade for assignment ID {assignment_id} set to {grade}." + Style.RESET_ALL)
                     break
             else:
                 #context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -638,41 +657,30 @@ class LMSService(lms_pb2_grpc.LMSServicer):
         print(">>> answer query")
         print(request)
         try:
-            query_id = request.queryId
-            answer = request.answer
-            user_id = request.token# Assuming the answer is sent in the request
-
-            # Load existing queries
-            if os.path.exists(queries_path):
-                with open(queries_path, 'r') as file:
-                    queries_data = json.load(file)
-            else:
-                queries_data = []
-
-            # Find the query and update the answer
-            for query in queries_data:
-                if str(query.get("query_id", "")) == query_id:
-                    '''if "answered" in query and query["answered"]:
-
-                        context.set_details(f'ERROR: Query {query_id} has already been answered.')
-                        return lms_pb2.AnswerQueryResponse(success=False, message="Query already answered")'''
-
-                    # Update the query with the answer and mark it as answered
-                    query["answer"] = answer
-                    query["answered"] = True
-                    query["answered_by"] = user_id
-                    break
-            else:
-                context.set_code(grpc.StatusCode.NOT_FOUND)
-                context.set_details(f'Query ID {query_id} not found.')
-                return lms_pb2.AnswerQueryResponse(success=False, message="Query not found.")
-
-            # Save updated queries data
-            with open(queries_path, 'w') as file:
-                json.dump(queries_data, file, indent=4)
-
-            return lms_pb2.AnswerQueryResponse(success=True, message="Query answered successfully.")
-
+            if self.raft_node.state == 'Leader':
+                # append entries requests
+                new_entry = {
+                    "token": request.token, 
+                    "query_id": request.queryId,
+                    "answer": request.answer,
+                    "term": self.raft_node.current_term,
+                    "user_id": request.token,
+                    "type": "answer_query"
+                }
+                votes = self.append_entries_raft(new_entry)
+                # if votes > majority
+                if votes >= (len(self.raft_node.peers) // 2):
+                    print(">>>>> majority votes recieved !")
+                    ''' self commit '''
+                    print("Self Commit")
+                    log_entry_req = lms_pb2.LogEntry(query_id=request.queryId,
+                                                     answer=request.answer,
+                                                     user_id=request.token,
+                                                     token=request.token)
+                    self.answer_query_save(request=log_entry_req)
+                    ''' send commit requests '''
+                    self.commit_entries_raft(new_entry)
+                    return lms_pb2.AnswerQueryResponse(success=True, message="Query answered successfully.")
         except json.JSONDecodeError as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f'JSON Decode Error: {str(e)}')
@@ -681,6 +689,43 @@ class LMSService(lms_pb2_grpc.LMSServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f'Error answering query: {str(e)}')
             return lms_pb2.AnswerQueryResponse(success=False, message="Failed to answer query.")
+        
+        
+    def answer_query_save(self, request):   
+        # print("## answer_query_save") 
+        # print(request)    
+        query_id = request.query_id
+        answer = request.answer
+        user_id = request.token# Assuming the answer is sent in the request
+
+        # Load existing queries
+        if os.path.exists(queries_path):
+            with open(queries_path, 'r') as file:
+                queries_data = json.load(file)
+        else:
+            queries_data = []
+
+        # Find the query and update the answer
+        for query in queries_data:
+            if str(query.get("query_id", "")) == query_id:
+                # Update the query with the answer and mark it as answered
+                query["answer"] = answer
+                query["answered"] = True
+                query["answered_by"] = user_id
+                break
+            # else:
+            #     print("@@@ Query not found.")
+            #     return lms_pb2.AnswerQueryResponse(success=False, message="Query not found.")
+
+        # Save updated queries data
+        with open(queries_path, 'w') as file:
+            json.dump(queries_data, file, indent=4)
+
+        # print("dumped queries data")
+
+        return lms_pb2.AnswerQueryResponse(success=True, message="Query answered successfully.")
+
+        
 
 
     def GetLlmAnswer(self, request, context):
@@ -702,7 +747,7 @@ class LMSService(lms_pb2_grpc.LMSServicer):
                     print(f"Question: {question}")
                     llm_request = lms_pb2.LLMQueryRequest(question=question)
                     llm_answer = llm_stub.GetLLMAnswerResponse(llm_request)
-                    print(f"Answer: {llm_answer.answer}")
+                    print(Fore.MAGENTA+f"Answer: {llm_answer.answer}"+ Style.RESET_ALL)
                     query['answer'] = llm_answer.answer
 
                     break
@@ -729,7 +774,8 @@ class LMSService(lms_pb2_grpc.LMSServicer):
 def serve(node_name, bind_address):
     raft_service = LMSRaftService(node_name, node_addresses, 
                                   LMSService.save_query, LMSService.handle_text_upload,
-                                  LMSService.update_data, LMSService.submit_grade)
+                                  LMSService.update_data, LMSService.submit_grade,
+                                  LMSService.answer_query_save)
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     lms_pb2_grpc.add_LMSServicer_to_server(LMSService(raft_service), server)

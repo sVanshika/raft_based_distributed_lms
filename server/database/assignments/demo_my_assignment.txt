@@ -1,1 +1,0 @@
-This is the CLI written assignment. Please grade it.

@@ -24,7 +24,7 @@ role = None  # Store role globally for menu differentiation
 
 def run_client():
     try:
-        print("\n\n\n\n\nWelcome to LMS! \nPlease login to proceed.")
+        print( Style.BRIGHT + Fore.YELLOW + "\n\n\n\n\nWelcome to LMS! \nPlease login to proceed."+ Style.RESET_ALL)
         token = login_module()
 
         if role == "student":
@@ -45,7 +45,7 @@ def get_leader(node_address):
         channel = grpc.insecure_channel(node_address)
         stub = lms_pb2_grpc.RaftStub(channel)
         response = stub.getLeader(lms_pb2.Empty())
-        print(f"Asking {node_address} about leader. Found: {response.leader_ip_address}")
+        print(f"Asking {node_address} about leader. Found: {Fore.BLUE}{response.leader_ip_address}{Style.RESET_ALL}")
         return response.leader_ip_address
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.UNAVAILABLE:
@@ -157,7 +157,7 @@ def login_module():
     login_response = login(role, username, password)
 
     if login_response.success:
-        print(f"Login successful. Welcome, {username}!")
+        print(Fore.GREEN +f"Login successful. Welcome, {username}!"+ Style.RESET_ALL)
         return str(login_response.token)
     else:
         print("Login failed - Invalid role, username, or password. Please login again!")
@@ -192,7 +192,11 @@ def logout(token):
 
 def post(token, data_type, data, query_answer_choice):
     id = active_sessions[token]
-    post_request = lms_pb2.PostRequest(token=id, type=data_type)
+    if query_answer_choice == 1: #instructor
+        post_request = lms_pb2.PostRequest(token=id, type=data_type, filetype="instructor")
+    elif query_answer_choice == 2: #llm 
+        post_request = lms_pb2.PostRequest(token=id, type=data_type, filetype="llm")
+    
 
     if isinstance(data, str):
         post_request.data = data.encode('utf-8')  # Encode only if it's a string
@@ -211,7 +215,8 @@ def post(token, data_type, data, query_answer_choice):
                 if query_answer_choice == 1: #instructor
                     print("Instructor will answer your query!")
                 elif query_answer_choice == 2: #llm 
-                    pass
+                    # print(f"%%%%%% {post_response.message}")
+                    print(Fore.RED + f"\n\tAnswer: {post_response.message}"+Style.RESET_ALL)
                     # retrieving query response from llm server
                     # get_llm_response(post_response.query_id)
 
@@ -316,13 +321,14 @@ def get(token, data_type, optional_data=None):
     if role == "student":
         # For students, the optional_data should be their own ID
         optional_data = active_sessions[token]
-        print(f"Retrieving {data_type} for student with ID: {optional_data}")
+        print(Fore.GREEN +f"Retrieving {data_type} for student with ID: {optional_data}"+Style.RESET_ALL)
     elif role == "instructor":
         # Instructors can retrieve all data or filter by student ID
         if optional_data:
-            print(f"Retrieving {data_type} for student ID: {optional_data}")
+            print(Fore.GREEN +f"Retrieving {data_type} for student with ID: {optional_data}"+Style.RESET_ALL)
         else:
-            print(f"Retrieving all {data_type}")
+            print(Fore.GREEN + f"Retrieving all {data_type}" + Style.RESET_ALL)
+
 
     # Create the GetRequest with the token, type of data, and optional data if available
     get_request = lms_pb2.GetRequest(token=token, type=data_type, optional_data=optional_data or "")
@@ -470,12 +476,12 @@ def answer_query(stub, token):
     answer_request = lms_pb2.AnswerQueryRequest(queryId=query_id, answer=answer_data, token=token)
 
     try:
-        print("Vanshika")
+        # print("Vanshika")
         response = stub.AnswerQuery(answer_request)
     except grpc.RpcError as error:
-        print(f"RPC Error in get_llm_response: {error.code()} - {error.details()}")
+        print(f"RPC Error in answer_query: {error.code()} - {error.details()}")
     except Exception as ex:
-        print(f"Error in get_llm_response: {str(ex)}")
+        print(f"Error in answer_query: {str(ex)}")
 
     if response.success:
         print(Fore.GREEN + f"Answer submitted successfully for Query ID: {query_id}" + Style.RESET_ALL)

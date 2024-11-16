@@ -23,7 +23,7 @@ message PostRequest {
     string type = 2;
     bytes data = 3;
     string filename = 4;  // For assignments
-    string filetype = 5; // "pdf" or "txt"
+    string filetype = 5; // for assignment: "pdf" or "txt" for query: "instructor" or "llm"
 }
 
 // Response for post data
@@ -179,6 +179,10 @@ message LogEntry {
     string filetype = 6;
     string assignmentId = 7;
     string grade = 8;
+    string query_id = 9;
+    string answer = 10;
+    string user_id = 11;
+    string query_answer_choice = 12;
 }
 
 

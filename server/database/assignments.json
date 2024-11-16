@@ -1,8 +1,16 @@
 [
     {
         "user_id": "S101",
-        "data_path": "server\\database\\assignments\\vans.txt",
+        "data_path": "server\\database\\assignments\\assignment1.txt",
         "assignment_id": "1",
         "grade": "C"
+    },
+    {
+        "user_id": "S103",
+        "data_path": "server\\database\\assignments\\report.txt",
+        "assignment_id": "1"
     }
 ]
+
+
+

@@ -8,10 +8,13 @@ from protos import lms_pb2_grpc
 import os
 
 
+import colorama
+from colorama import Fore, Back, Style
+colorama.init()
 
 
 class LMSRaftService(lms_pb2_grpc.RaftServicer):
-    def __init__(self, node_id, peers, save_query_func, handle_text_upload, update_data, submit_grade):
+    def __init__(self, node_id, peers, save_query_func, handle_text_upload, update_data, submit_grade, answer_query_save):
         self.node_id = node_id
         # self.peers = {k: v for k, v in peers.items() if k != self.node_id}
         self.peers = peers
@@ -37,6 +40,7 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
         self.handle_text_upload = handle_text_upload
         self.update_data = update_data
         self.submit_grade = submit_grade
+        self.answer_query_save = answer_query_save
         self.reset_election_timer()
 
 
@@ -50,7 +54,7 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
 
 
     def start_election(self):
-        print("starting election...")
+        print(Fore.GREEN +"starting election..."+ Style.RESET_ALL)
         self.state = 'Candidate'
         self.current_term += 1
         self.voted_for = self.node_id
@@ -87,7 +91,7 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
 
         # If majority of votes are received, this node becomes the leader
         if votes > (len(self.peers) // 2):
-            print(f"Majority votes received! {self.node_id} becomes leader !")
+            print(Fore.BLUE + f"Majority votes received! {self.node_id} becomes leader !" + Style.RESET_ALL)
             self.state = 'Leader'
 
             self.leader_id = self.node_id
@@ -122,7 +126,7 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
 
 
     def requestVote(self, request, context):
-        print("request vote starts")
+        print(Style.BRIGHT + Fore.YELLOW +"request vote starts"+ Style.RESET_ALL)
         if request.term < self.current_term:
             return lms_pb2.VoteResponse(vote_granted=False)
 
@@ -138,7 +142,7 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
         if (self.voted_for is None or self.voted_for == request.candidate_id) and (self.is_log_up_to_date(request.last_log_index, request.last_log_term)):
             self.voted_for = request.candidate_id
             self.reset_election_timer()  # Reset election timer when vote is granted
-            print(f"Vote granted for {self.voted_for}, term {request.term}")
+            print(Fore.BLUE +f"Vote granted for {self.voted_for}, term {request.term}"+ Style.RESET_ALL)
             return lms_pb2.VoteResponse(vote_granted=True)
         else:
             print(f"Vote NOT granted as log index is less than mine - Req.logindex={request.last_log_index}  Self.logindex={self.last_log_term}!")
@@ -164,7 +168,7 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
 
 
     def send_heartbeat(self, nodeid, port):
-        print(f"Sending heartbeat to {nodeid}, port = {port}")
+        print(f"Sending {Fore.RED}heartbeat{Style.RESET_ALL} to {nodeid}, port = {port}")
         # Send heartbeats to followers to maintain leadership
         try:
             channel = grpc.insecure_channel(port, options=[('grpc.enable_http_proxy', 0)])
@@ -190,7 +194,7 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
 
 
     def appendEntries(self, request, context):
-        print(f"\n{request.operation} - Append Entries received from {request.leader_id} - Term:{request.term}")
+        print(f"\n{Style.BRIGHT + Fore.MAGENTA}{request.operation}{Style.RESET_ALL} - Append Entries received from {request.leader_id} - Term:{request.term}")
 
         # Reset election timer when appendEntries are received (heartbeat)
         if request.term >= self.current_term:
@@ -221,7 +225,7 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
                 # append new entries
                 self.logs = self.logs[:request.prev_log_index] + list(request.entries)  # Replace conflicting entries
 
-                print("New entries appended successfully.")
+                print(Fore.CYAN +"New entries appended successfully."+ Style.RESET_ALL)
                 # print(f">> self.logs = {self.logs}")
                 
                 return self.appendEntriesReply(self.node_id, request.leader_id, self.current_term, True, len(self.logs) - 1)
@@ -255,14 +259,23 @@ class LMSRaftService(lms_pb2_grpc.RaftServicer):
                         self.update_data(self, relative_path=relative_path, id=entry.token, 
                                          directory=assignment_directory, isAssignment=True) 
                     else:
-                        print("nooooooo")
+                        pass
                 elif entry.grade:
-                    print("GRADEEEEEEEEEEEEEEEEEE")
+                    # print("GRADEEEEEEEEEEEEEEEEEE")
                     print(entry)
+                    
                     self.submit_grade(self, request=entry)
 
+                elif entry.type == "answer_query":
+                    # print("ANSWER QUERY !")
+                    log_entry_req = lms_pb2.LogEntry(query_id=entry.query_id,
+                                                     answer=entry.answer,
+                                                     user_id=entry.token,
+                                                     token=entry.token)
+                    self.answer_query_save(self, request=log_entry_req)
+
                 self.commit_index += 1
-                print("New entries committed successfully.")
+                print(Fore.CYAN +"New entries appended successfully."+ Style.RESET_ALL)
                 # print(f">> self.logs = {self.logs}")
 
                 return self.appendEntriesReply(self.node_id, request.leader_id, self.current_term, True, len(self.logs) - 1)

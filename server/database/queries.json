@@ -2,66 +2,32 @@
     {
         "query_id": 1,
         "user_id": "S101",
-        "data": "This is my first query."
+        "data": "When will quiz 3 be scheduled?"
     },
     {
         "query_id": 2,
         "user_id": "S101",
-        "data": "This is my first query."
+        "data": "who is the instructor for this course?",
+        "answer": "Pratik Narang"
     },
     {
         "query_id": 3,
         "user_id": "S101",
-        "data": "This is my first query."
-    },
-    {
-        "query_id": 4,
-        "user_id": "S101",
-        "data": "first query",
-        "answer": "my answer",
+        "data": "Will we study HDFS?",
+        "answer": "on thursday",
         "answered": true,
         "answered_by": "I001"
     },
     {
-        "query_id": 5,
-        "user_id": "S101",
-        "data": "who is the instructor for this course?",
-        "answer": "projectroot/server/database/course/context.txt"
+        "query_id": 1,
+        "user_id": "S103",
+        "data": "what are the pre-requisite of the course?",
+        "answer": "basic knowledge of operating systems and computer networks"
     },
     {
-        "query_id": 6,
-        "user_id": "S101",
-        "data": "who is the instructor for this course?",
-        "answer": "projectroot/server/database/course/context.txt"
-    },
-    {
-        "query_id": 7,
-        "user_id": "S101",
-        "data": "who is the instructor for this course?",
-        "answer": "Pratik Narang"
-    },
-    {
-        "query_id": 8,
-        "user_id": "S101",
-        "data": "when will be the mid semester exam held?",
-        "answer": "7th Oct 2024"
-    },
-    {
-        "query_id": 9,
-        "user_id": "S101",
-        "data": "when will be the mid semester exam held?",
-        "answer": "7th Oct 2024"
-    },
-    {
-        "query_id": 10,
-        "user_id": "S101",
-        "data": "who is the instructor for this course?",
-        "answer": "Pratik Narang"
-    },
-    {
-        "query_id": 11,
-        "user_id": "S101",
-        "data": "how long is the comprehensive exam?",
-        "answer": "180-minute"
+        "query_id": 2,
+        "user_id": "S103",
+        "data": "what are the pre-requisite of the course?",
+        "answer": "basic knowledge of operating systems and computer networks"
     }
 ]

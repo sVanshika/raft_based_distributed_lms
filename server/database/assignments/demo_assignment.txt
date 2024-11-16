@@ -1,1 +1,0 @@
-This is my first assignment which is written from the CLI directly. Please grade it.
